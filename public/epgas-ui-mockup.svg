@@ -1,0 +1,136 @@
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .header-bg { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1; }
+      .panel-bg { fill: #ffffff; }
+      .border { stroke: #e2e8f0; stroke-width: 1; fill: none; }
+      .text-title { font-family: 'Hiragino Sans', sans-serif; font-size: 18px; font-weight: bold; fill: #1a202c; }
+      .text-content { font-family: 'Hiragino Sans', sans-serif; font-size: 14px; fill: #4a5568; }
+      .text-small { font-family: 'Hiragino Sans', sans-serif; font-size: 12px; fill: #718096; }
+      .chat-input { fill: #f7fafc; stroke: #cbd5e0; stroke-width: 1; }
+      .send-button { fill: #3182ce; }
+      .button-text { font-family: 'Hiragino Sans', sans-serif; font-size: 12px; fill: white; font-weight: bold; }
+      .message-user { fill: #e6fffa; stroke: #38b2ac; stroke-width: 1; }
+      .message-ai { fill: #f0f4f8; stroke: #a0aec0; stroke-width: 1; }
+      .preview-content { fill: #fafafa; stroke: #e2e8f0; stroke-width: 1; }
+      .chart-bar { fill: #4299e1; }
+      .chart-line { stroke: #48bb78; stroke-width: 2; fill: none; }
+    </style>
+  </defs>
+
+  <!-- Header -->
+  <rect class="header-bg" x="0" y="0" width="1200" height="60"/>
+  <text class="text-title" x="24" y="35">EPGAS Analytics - 電力・ガス取引分析レポート自動生成</text>
+  <text class="text-small" x="1050" y="35">ChatGPT API設定 | ユーザー設定</text>
+
+  <!-- Main Container -->
+  <rect class="border" x="0" y="60" width="1200" height="740"/>
+
+  <!-- Left Panel - Chat Section -->
+  <rect class="panel-bg" x="0" y="60" width="600" height="740"/>
+  <rect class="border" x="600" y="60" width="1" height="740"/>
+  
+  <!-- Chat Header -->
+  <text class="text-title" x="24" y="100">チャット部</text>
+  
+  <!-- Chat Messages Area -->
+  <rect class="border" x="24" y="120" width="552" height="520"/>
+  
+  <!-- Sample Chat Messages -->
+  <!-- User Message -->
+  <rect class="message-user" x="200" y="140" width="350" height="60" rx="8"/>
+  <text class="text-content" x="220" y="160">2024年度の電力販売実績データから</text>
+  <text class="text-content" x="220" y="180">月別の売上推移と顧客セグメント分析の</text>
+  <text class="text-content" x="220" y="195">レポートを作成してください</text>
+  
+  <!-- AI Response -->
+  <rect class="message-ai" x="50" y="220" width="400" height="80" rx="8"/>
+  <text class="text-content" x="70" y="240">承知いたしました。電力販売実績データを基に</text>
+  <text class="text-content" x="70" y="255">月別売上推移と顧客セグメント分析レポートを</text>
+  <text class="text-content" x="70" y="270">生成します。HTMLプレビューをご確認ください。</text>
+  <text class="text-small" x="70" y="290">📊 チャート生成中... ✅ 完了</text>
+  
+  <!-- Another User Message -->
+  <rect class="message-user" x="180" y="320" width="370" height="60" rx="8"/>
+  <text class="text-content" x="200" y="340">グラフの色をもう少し見やすく</text>
+  <text class="text-content" x="200" y="355">調整してもらえますか？</text>
+  <text class="text-content" x="200" y="370">特に棒グラフの部分を</text>
+  
+  <!-- File Upload Area -->
+  <rect class="chat-input" x="24" y="560" width="552" height="40" rx="4"/>
+  <text class="text-small" x="35" y="580">📎 CSVファイルをドラッグ&ドロップ | サンプルデータ: power_sales_2024.csv</text>
+  
+  <!-- Chat Input Area -->
+  <rect class="chat-input" x="24" y="610" width="450" height="50" rx="4"/>
+  <text class="text-content" x="35" y="635">分析内容や修正指示を入力してください...</text>
+  
+  <!-- Send Button -->
+  <rect class="send-button" x="490" y="610" width="86" height="50" rx="4"/>
+  <text class="button-text" x="520" y="640">送信</text>
+  
+  <!-- Right Panel - HTML Preview Section -->
+  <rect class="panel-bg" x="600" y="60" width="600" height="740"/>
+  
+  <!-- Preview Header -->
+  <text class="text-title" x="624" y="100">HTMLプレビュー部</text>
+  
+  <!-- Toolbar -->
+  <rect class="chat-input" x="624" y="110" width="552" height="35" rx="4"/>
+  <text class="text-small" x="640" y="130">🔍 フルスクリーン | 📱 レスポンシブ | 💾 HTML保存 | 📄 PDF出力</text>
+  
+  <!-- Preview Content Area -->
+  <rect class="preview-content" x="624" y="155" width="552" height="500" rx="4"/>
+  
+  <!-- Sample Report Content -->
+  <text class="text-title" x="650" y="185">2024年度 電力販売実績分析レポート</text>
+  <text class="text-small" x="650" y="205">生成日時: 2024年12月 | データ期間: 2024年1月-12月</text>
+  
+  <!-- Sample Chart 1 - Bar Chart -->
+  <text class="text-content" x="650" y="230">■ 月別売上推移</text>
+  <rect class="chart-bar" x="670" y="245" width="15" height="40"/>
+  <rect class="chart-bar" x="690" y="240" width="15" height="45"/>
+  <rect class="chart-bar" x="710" y="235" width="15" height="50"/>
+  <rect class="chart-bar" x="730" y="250" width="15" height="35"/>
+  <rect class="chart-bar" x="750" y="230" width="15" height="55"/>
+  <rect class="chart-bar" x="770" y="225" width="15" height="60"/>
+  <rect class="chart-bar" x="790" y="220" width="15" height="65"/>
+  <rect class="chart-bar" x="810" y="235" width="15" height="50"/>
+  <rect class="chart-bar" x="830" y="240" width="15" height="45"/>
+  <rect class="chart-bar" x="850" y="245" width="15" height="40"/>
+  <rect class="chart-bar" x="870" y="250" width="15" height="35"/>
+  <rect class="chart-bar" x="890" y="255" width="15" height="30"/>
+  
+  <text class="text-small" x="670" y="300">1月 2月 3月 4月 5月 6月 7月 8月 9月 10月 11月 12月</text>
+  
+  <!-- Sample Chart 2 - Line Chart -->
+  <text class="text-content" x="650" y="330">■ 顧客セグメント別推移</text>
+  <polyline class="chart-line" points="670,350 690,345 710,340 730,355 750,335 770,330 790,325 810,340 830,345 850,350 870,355 890,360"/>
+  
+  <!-- Sample Data Table -->
+  <text class="text-content" x="650" y="390">■ 主要指標サマリー</text>
+  <rect class="border" x="650" y="400" width="500" height="120"/>
+  
+  <!-- Table Headers -->
+  <rect class="chat-input" x="650" y="400" width="500" height="25"/>
+  <text class="text-small" x="665" y="415">セグメント | 売上高(百万円) | 前年比 | 顧客数</text>
+  
+  <!-- Table Rows -->
+  <text class="text-small" x="665" y="435">家庭用 | 15,240 | +5.2% | 45,600</text>
+  <text class="text-small" x="665" y="455">業務用 | 28,760 | +8.1% | 12,800</text>
+  <text class="text-small" x="665" y="475">産業用 | 42,350 | +3.7% | 2,100</text>
+  <text class="text-small" x="665" y="495">合計 | 86,350 | +5.6% | 60,500</text>
+  
+  <!-- Analysis Summary -->
+  <text class="text-content" x="650" y="545">■ 分析結果</text>
+  <text class="text-small" x="665" y="565">• 夏期(7-8月)の売上が最も高く、冬期需要も堅調</text>
+  <text class="text-small" x="665" y="580">• 業務用セグメントの成長率が最も高い(+8.1%)</text>
+  <text class="text-small" x="665" y="595">• 新規顧客獲得により全体として前年比5.6%増</text>
+  <text class="text-small" x="665" y="610">• 産業用の単価上昇が収益性向上に寄与</text>
+  
+  <!-- Footer -->
+  <text class="text-small" x="650" y="640">※ このレポートはLLMにより自動生成されました</text>
+  
+  <!-- Status Bar -->
+  <rect class="chat-input" x="624" y="670" width="552" height="30" rx="4"/>
+  <text class="text-small" x="640" y="688">✅ レポート生成完了 | 📊 チャート: 2個 | 📋 データポイント: 144個 | ⚡ 生成時間: 3.2秒</text>
+</svg>
