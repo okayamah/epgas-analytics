@@ -72,7 +72,7 @@ export default function EPGASAnalytics() {
       if (response.ok) {
         const data = await response.json()
         if (data.latestReportFile) {
-          setCurrentReportFile(`/${data.latestReportFile}`)
+          setCurrentReportFile(`/api/reports/${data.latestReportFile}`)
           return data.latestReportFile
         }
       }
@@ -132,7 +132,7 @@ export default function EPGASAnalytics() {
               case 'file_saved':
                 setHtmlGenerationStatus('completed')
                 setGenerationProgress(data.message)
-                setCurrentReportFile(`/${data.filename}`)
+                setCurrentReportFile(`/api/reports/${data.filename}`)
                 setShowSampleReport(true)
                 
                 // モバイルでは自動でプレビュー表示に切り替え
@@ -278,7 +278,7 @@ export default function EPGASAnalytics() {
                 setTimeout(async () => {
                   const latestFile = await checkForLatestReport()
                   if (latestFile) {
-                    setCurrentReportFile(`/${latestFile}`)
+                    setCurrentReportFile(`/api/reports/${latestFile}`)
                     setShowSampleReport(true)
                     console.log('フォールバック: 最新レポートを確認しました:', latestFile)
                     

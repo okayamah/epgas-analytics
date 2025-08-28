@@ -370,11 +370,18 @@ async function saveHtmlFile(htmlContent: string) {
   
   const fs = require('fs');
   const path = require('path');
-  const publicDir = path.join(process.cwd(), 'public');
-  const filePath = path.join(publicDir, htmlFileName);
+  
+  // Vercelの書き込み可能な /tmp ディレクトリを使用
+  const tmpDir = '/tmp';
+  const filePath = path.join(tmpDir, htmlFileName);
+  
+  // /tmp ディレクトリが存在しない場合は作成（ローカル開発用）
+  if (!fs.existsSync(tmpDir)) {
+    fs.mkdirSync(tmpDir, { recursive: true });
+  }
   
   fs.writeFileSync(filePath, htmlContent, 'utf8');
-  console.log(`HTML file saved: ${htmlFileName}`);
+  console.log(`HTML file saved: ${filePath}`);
   
   notifyProgress('file_saved', { 
     message: 'HTMLファイルの保存が完了しました',
@@ -421,11 +428,18 @@ async function createFallbackHtml(fullResponse: string) {
   
   const fs = require('fs');
   const path = require('path');
-  const publicDir = path.join(process.cwd(), 'public');
-  const filePath = path.join(publicDir, htmlFileName);
+  
+  // Vercelの書き込み可能な /tmp ディレクトリを使用
+  const tmpDir = '/tmp';
+  const filePath = path.join(tmpDir, htmlFileName);
+  
+  // /tmp ディレクトリが存在しない場合は作成（ローカル開発用）
+  if (!fs.existsSync(tmpDir)) {
+    fs.mkdirSync(tmpDir, { recursive: true });
+  }
   
   fs.writeFileSync(filePath, fallbackHtml, 'utf8');
-  console.log(`Fallback HTML file saved: ${htmlFileName}`);
+  console.log(`Fallback HTML file saved: ${filePath}`);
   
   notifyProgress('file_saved', { 
     message: 'HTMLファイルの保存が完了しました（フォールバック）',

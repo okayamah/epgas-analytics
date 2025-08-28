@@ -3,8 +3,23 @@ export async function GET() {
     const fs = require('fs');
     const path = require('path');
     
-    const publicDir = path.join(process.cwd(), 'public');
-    const files = fs.readdirSync(publicDir);
+    // Vercelの /tmp ディレクトリを使用
+    const tmpDir = '/tmp';
+    
+    // /tmp ディレクトリが存在しない場合（ローカル開発環境）
+    if (!fs.existsSync(tmpDir)) {
+      return new Response(JSON.stringify({ 
+        latestReportFile: null,
+        allReportFiles: [],
+        message: 'No reports available yet'
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+    
+    const files = fs.readdirSync(tmpDir);
     
     // report_ で始まるHTMLファイルを検索し、最新のものを取得
     const reportFiles = files
