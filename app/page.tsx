@@ -10,7 +10,6 @@ import {
   FileText,
   Settings,
   User,
-  Upload,
   MessageSquare,
   Bot,
   Loader2,
@@ -30,6 +29,12 @@ interface Message {
 }
 
 export default function EPGASAnalytics() {
+  // Use local state instead of useChat for now
+  const [localInput, setLocalInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  // ストリーミングは必須機能として固定
+  const useStreaming = true
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -39,12 +44,19 @@ export default function EPGASAnalytics() {
       timestamp: new Date(),
     },
   ])
-  const [inputMessage, setInputMessage] = useState("")
   const [showSampleReport, setShowSampleReport] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [currentReportFile, setCurrentReportFile] = useState("/sample-report.html")
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [activeView, setActiveView] = useState<"chat" | "preview">("chat")
+  
+  // HTML生成進捗状態
+  const [htmlGenerationStatus, setHtmlGenerationStatus] = useState<
+    "idle" | "started" | "ai_completed" | "parsing" | "saving" | "completed" | "error"
+  >("idle")
+  const [generationProgress, setGenerationProgress] = useState("")
+  const [progressError, setProgressError] = useState("")
+  const [sseConnected, setSseConnected] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -53,86 +65,288 @@ export default function EPGASAnalytics() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
+  const checkForLatestReport = async () => {
+    try {
+      // publicディレクトリ内の最新のreport_*.htmlファイルを検索
+      const response = await fetch('/api/latest-report')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.latestReportFile) {
+          setCurrentReportFile(`/${data.latestReportFile}`)
+          return data.latestReportFile
+        }
+      }
+    } catch (error) {
+      console.log('No latest report available yet')
+    }
+    return null
+  }
+
   useEffect(() => {
     scrollToBottom()
   }, [messages])
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isProcessing) return
+  // Server-Sent Events接続を管理
+  useEffect(() => {
+    let eventSource: EventSource | null = null
+    let reconnectTimer: NodeJS.Timeout | null = null
+    let reconnectAttempts = 0
+    const maxReconnectAttempts = 3
 
-    setIsProcessing(true)
+    const connectSSE = () => {
+      try {
+        eventSource = new EventSource('/api/html-progress')
+        
+        eventSource.onopen = () => {
+          console.log('SSE接続が開かれました')
+          setSseConnected(true)
+          reconnectAttempts = 0
+        }
+        
+        eventSource.onmessage = (event) => {
+          try {
+            const { type, data } = JSON.parse(event.data)
+            
+            switch (type) {
+              case 'html_generation_started':
+                setHtmlGenerationStatus('started')
+                setGenerationProgress(data.message)
+                setProgressError("")
+                break
+              
+              case 'ai_response_completed':
+                setHtmlGenerationStatus('ai_completed')
+                setGenerationProgress(data.message)
+                break
+              
+              case 'html_parsing_started':
+                setHtmlGenerationStatus('parsing')
+                setGenerationProgress(data.message)
+                break
+              
+              case 'file_saving_started':
+                setHtmlGenerationStatus('saving')
+                setGenerationProgress(data.message)
+                break
+              
+              case 'file_saved':
+                setHtmlGenerationStatus('completed')
+                setGenerationProgress(data.message)
+                setCurrentReportFile(`/${data.filename}`)
+                setShowSampleReport(true)
+                
+                // モバイルでは自動でプレビュー表示に切り替え
+                if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                  setActiveView("preview")
+                }
+                
+                // 3秒後にidleに戻す
+                setTimeout(() => {
+                  setHtmlGenerationStatus('idle')
+                  setGenerationProgress("")
+                }, 3000)
+                break
+              
+              case 'error':
+                setHtmlGenerationStatus('error')
+                setProgressError(data.message + (data.error ? `: ${data.error}` : ''))
+                setGenerationProgress("")
+                break
+              
+              case 'timeout':
+                console.log('SSE接続がタイムアウトしました:', data.message)
+                break
+              
+              case 'connected':
+                console.log('SSE接続が確立されました:', data.message)
+                break
+            }
+          } catch (error) {
+            console.error('SSEデータの解析に失敗:', error)
+          }
+        }
 
-    // Add user message
-    const newUserMessage: Message = {
-      id: messages.length + 1,
+        eventSource.onerror = () => {
+          console.log('SSE接続でエラーが発生しました。再接続を試行します。')
+          setSseConnected(false)
+          
+          if (eventSource) {
+            eventSource.close()
+            eventSource = null
+          }
+          
+          // 再接続を試行（最大3回まで）
+          if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++
+            console.log(`SSE再接続を試行中... (${reconnectAttempts}/${maxReconnectAttempts})`)
+            
+            reconnectTimer = setTimeout(() => {
+              connectSSE()
+            }, 2000 * reconnectAttempts) // 段階的に遅延を増加
+          } else {
+            console.log('SSE再接続の最大試行回数に達しました。フォールバック機能を使用します。')
+            setSseConnected(false)
+          }
+        }
+
+      } catch (error) {
+        console.error('SSE初期化エラー:', error)
+      }
+    }
+
+    connectSSE()
+
+    return () => {
+      if (eventSource) {
+        eventSource.close()
+        eventSource = null
+      }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
+    }
+  }, [])
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (isLoading || !localInput || localInput.trim().length === 0) return
+
+    setIsLoading(true)
+
+    // Add user message to local state
+    const userMessage: Message = {
+      id: Date.now(),
       type: "user",
-      content: inputMessage,
+      content: localInput,
       timestamp: new Date(),
     }
 
-    // Add AI response placeholder
-    const aiResponse: Message = {
-      id: messages.length + 2,
-      type: "ai",
-      content: "",
-      timestamp: new Date(),
-      isStreaming: true,
-    }
+    setMessages(prev => [...prev, userMessage])
+    const currentInput = localInput
+    setLocalInput("")
 
-    setMessages((prev) => [...prev, newUserMessage, aiResponse])
-    setInputMessage("")
+    try {
+      // Call API directly
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: currentInput }],
+          stream: useStreaming
+        }),
+      })
 
-    const streamingTexts = [
-      "分析を開始しています...",
-      "データを処理中...",
-      "電力販売データを解析しています...",
-      "グラフとチャートを生成中...",
-      "レポートを最終化しています...",
-      "2024年度電力販売実績分析レポートを生成しました。右側のプレビューでご確認ください。\n\n主要な分析結果:\n• 総売上高: 86.4億円（前年比+5.6%）\n• 総顧客数: 60,500件（前年比+8.2%）\n• 夏期需要が最も高く、猛暑による冷房需要増加が寄与\n• 業務用セグメントが好調（+8.1%）",
-    ]
+      if (!response.ok) {
+        throw new Error('API call failed')
+      }
 
-    for (let i = 0; i < streamingTexts.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 800))
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === aiResponse.id
-            ? {
-                ...msg,
-                content: streamingTexts[i],
-                isStreaming: i < streamingTexts.length - 1,
+      // Add AI response placeholder
+      const aiMessage: Message = {
+        id: Date.now() + 1,
+        type: "ai",
+        content: "",
+        timestamp: new Date(),
+        isStreaming: true,
+      }
+
+      setMessages(prev => [...prev, aiMessage])
+
+      if (useStreaming) {
+        // Handle streaming response
+        const reader = response.body?.getReader()
+        if (reader) {
+          let accumulatedText = ""
+          const decoder = new TextDecoder()
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) {
+              // Mark streaming as complete
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.id === aiMessage.id 
+                    ? { ...msg, content: accumulatedText, isStreaming: false }
+                    : msg
+                )
+              )
+              
+              // SSE接続が失敗している場合のフォールバック
+              if (!sseConnected) {
+                setTimeout(async () => {
+                  const latestFile = await checkForLatestReport()
+                  if (latestFile) {
+                    setCurrentReportFile(`/${latestFile}`)
+                    setShowSampleReport(true)
+                    console.log('フォールバック: 最新レポートを確認しました:', latestFile)
+                    
+                    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                      setActiveView("preview")
+                    }
+                  }
+                }, 2000)
               }
-            : msg,
-        ),
-      )
-    }
+              
+              break
+            }
 
-    setShowSampleReport(true)
-    setIsProcessing(false)
-    if (window.innerWidth < 768) {
-      setActiveView("preview")
-    }
-  }
+            const chunk = decoder.decode(value, { stream: true })
+            accumulatedText += chunk
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file && file.type === "text/csv") {
-      const uploadMessage: Message = {
-        id: messages.length + 1,
-        type: "user",
-        content: `CSVファイル「${file.name}」をアップロードしました。このデータを分析してください。`,
+            // Update AI message with accumulated text (still streaming)
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === aiMessage.id 
+                  ? { ...msg, content: accumulatedText, isStreaming: true }
+                  : msg
+              )
+            )
+          }
+        }
+      } else {
+        // Handle non-streaming response
+        const responseData = await response.json()
+        const content = responseData.content || ''
+
+        // Update AI message with complete response
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === aiMessage.id 
+              ? { ...msg, content: content, isStreaming: false }
+              : msg
+          )
+        )
+      }
+    } catch (error) {
+      console.error('Error calling API:', error)
+      // Add error message
+      const errorMessage: Message = {
+        id: Date.now() + 2,
+        type: "ai",
+        content: "申し訳ございません。エラーが発生しました。Ollamaサーバーが起動していることを確認してください。",
         timestamp: new Date(),
       }
-      setMessages((prev) => [...prev, uploadMessage])
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
     }
   }
+
 
   const handleDownloadHTML = () => {
     if (!showSampleReport) return
 
     // Create a download link for the HTML content
     const link = document.createElement("a")
-    link.href = "/sample-report.html"
-    link.download = "電力販売実績分析レポート_2024.html"
+    link.href = currentReportFile
+    
+    // ファイル名から拡張子を除いた部分を取得してダウンロード名を生成
+    const fileName = currentReportFile.split('/').pop() || 'report.html'
+    const baseName = fileName.replace('.html', '')
+    link.download = `${baseName}_電力ガス分析レポート.html`
+    
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -281,7 +495,9 @@ export default function EPGASAnalytics() {
 
           {/* Chat Input */}
           <div className="border-t p-4 md:p-6">
-            <div className="mb-3 md:mb-4">
+            {/* ストリーミングは必須機能のためボタンを非表示 */}
+            {/* CSVアップロード機能は現時点では非搭載のため非表示 */}
+            {/* <div className="mb-3 md:mb-4 flex gap-2">
               <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" id="csv-upload" />
               <label htmlFor="csv-upload">
                 <Button
@@ -296,30 +512,40 @@ export default function EPGASAnalytics() {
                   </span>
                 </Button>
               </label>
-            </div>
+              <Button
+                variant={useStreaming ? "default" : "outline"}
+                size="sm"
+                onClick={() => setUseStreaming(!useStreaming)}
+                className="text-xs md:text-sm"
+              >
+                {useStreaming ? "ストリーミング" : "一括応答"}
+              </Button>
+            </div> */}
 
-            <div className="flex gap-2 md:gap-3">
+            <form onSubmit={handleSendMessage} className="flex gap-2 md:gap-3">
               <Textarea
                 ref={textareaRef}
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
+                value={localInput}
+                onChange={(e) => {
+                  setLocalInput(e.target.value)
+                }}
                 placeholder="分析したい内容を入力してください（例：2024年度の電力販売実績を分析してください）"
                 className="flex-1 min-h-[60px] md:min-h-[80px] resize-none text-sm"
-                disabled={isProcessing}
+                disabled={isLoading}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
-                    handleSendMessage()
+                    handleSendMessage(e as any)
                   }
                 }}
               />
-              <Button onClick={handleSendMessage} disabled={!inputMessage.trim() || isProcessing} className="self-end">
-                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              <Button type="submit" disabled={isLoading || !localInput || localInput.length === 0} className="self-end">
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </Button>
-            </div>
+            </form>
             <div className="flex justify-between items-center mt-2">
               <p className="text-xs text-muted-foreground">Enterで送信、Shift+Enterで改行</p>
-              {isProcessing && <p className="text-xs text-blue-600 font-medium">AI分析中...</p>}
+              {isLoading && <p className="text-xs text-blue-600 font-medium">AI分析中...</p>}
             </div>
           </div>
         </div>
@@ -370,10 +596,67 @@ export default function EPGASAnalytics() {
           </div>
 
           <div className="flex-1 overflow-hidden">
-            {showSampleReport ? (
+            {/* HTML生成中の表示 */}
+            {htmlGenerationStatus !== 'idle' && htmlGenerationStatus !== 'completed' && htmlGenerationStatus !== 'error' ? (
+              <div className="h-full flex items-center justify-center bg-muted/20 p-4">
+                <div className="text-center space-y-4 max-w-md">
+                  <div className="relative">
+                    <Loader2 className="w-12 h-12 md:w-16 md:h-16 text-blue-600 mx-auto animate-spin" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <FileText className="w-6 h-6 md:w-8 md:h-8 text-blue-600" />
+                    </div>
+                  </div>
+                  <h3 className="text-base md:text-lg font-medium text-foreground">AI分析中</h3>
+                  <div className="space-y-2">
+                    <p className="text-sm text-blue-600 font-medium">{generationProgress}</p>
+                    
+                    {/* 進捗バー */}
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: htmlGenerationStatus === 'started' ? '25%' : 
+                                htmlGenerationStatus === 'ai_completed' ? '50%' :
+                                htmlGenerationStatus === 'parsing' ? '75%' :
+                                htmlGenerationStatus === 'saving' ? '90%' : '0%'
+                        }}
+                      ></div>
+                    </div>
+                    
+                    <div className="text-xs text-muted-foreground">
+                      {htmlGenerationStatus === 'started' && '🤖 AI応答処理中...'}
+                      {htmlGenerationStatus === 'ai_completed' && '✅ AI応答完了'}
+                      {htmlGenerationStatus === 'parsing' && '🔍 HTML解析中...'}
+                      {htmlGenerationStatus === 'saving' && '💾 ファイル保存中...'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : htmlGenerationStatus === 'error' ? (
+              <div className="h-full flex items-center justify-center bg-muted/20 p-4">
+                <div className="text-center space-y-3 max-w-md">
+                  <div className="w-12 h-12 md:w-16 md:h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                    <X className="w-6 h-6 md:w-8 md:h-8 text-red-600" />
+                  </div>
+                  <h3 className="text-base md:text-lg font-medium text-red-600">エラーが発生しました</h3>
+                  <p className="text-sm text-red-500">{progressError}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setHtmlGenerationStatus('idle')
+                      setProgressError('')
+                    }}
+                    className="mt-4"
+                  >
+                    再試行
+                  </Button>
+                </div>
+              </div>
+            ) : showSampleReport ? (
               <iframe
                 ref={iframeRef}
-                src="/sample-report.html"
+                src={currentReportFile}
                 className="w-full h-full border-0"
                 title="Generated Report Preview"
                 style={{ backgroundColor: "#f8f9fa" }}
